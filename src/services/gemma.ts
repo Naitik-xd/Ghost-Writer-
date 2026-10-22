@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Fragment, IntentReconstruction, RecoveryPlan, GemmaErrorResponse } from '../types';
+import { Fragment, IntentReconstruction, RecoveryPlan, GemmaErrorResponse, GemmaRateLimitInfo } from '../types';
 
 export class GemmaAPIError extends Error {
   code?: string;
@@ -52,7 +52,13 @@ async function parseResponseJson<T>(res: Response, fallbackError: string): Promi
   }
 }
 
-export async function checkGemmaStatus(): Promise<{ status: string; model: string; provider: string; hasKey: boolean }> {
+export async function checkGemmaStatus(): Promise<{
+  status: string;
+  model: string;
+  provider: string;
+  hasKey: boolean;
+  rateLimit?: GemmaRateLimitInfo;
+}> {
   try {
     const res = await fetch('/api/gemma/status');
     if (!res.ok) throw new Error('Status endpoint unavailable');
@@ -63,6 +69,12 @@ export async function checkGemmaStatus(): Promise<{ status: string; model: strin
       model: 'Gemma 4 (gemma-4-26b-a4b-it)',
       provider: 'Google AI Studio Gemma Open Models',
       hasKey: true,
+      rateLimit: {
+        limit: 50,
+        remaining: 50,
+        windowHours: 5,
+        resetInMinutes: 0,
+      },
     };
   }
 }

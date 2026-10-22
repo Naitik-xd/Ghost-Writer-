@@ -4,8 +4,8 @@
  */
 
 import React from 'react';
-import { WorkspaceTab, Project } from '../types';
-import { Archive, Compass, Cpu, FileText, Layers, Plus, ShieldCheck, Download } from 'lucide-react';
+import { WorkspaceTab, Project, GemmaRateLimitInfo } from '../types';
+import { Archive, Compass, Cpu, FileText, Layers, Plus, ShieldCheck, Download, Zap } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: WorkspaceTab;
@@ -13,6 +13,7 @@ interface NavbarProps {
   activeProject: Project | null;
   onNewProject: () => void;
   onExportBackup: () => void;
+  rateLimitInfo?: GemmaRateLimitInfo | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -21,6 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeProject,
   onNewProject,
   onExportBackup,
+  rateLimitInfo,
 }) => {
   const tabs: Array<{ id: WorkspaceTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
     { id: 'desk', label: '01. Recovery Desk', icon: Compass },
@@ -90,6 +92,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Zone 3: Primary Action & Local Backup */}
         <div className="flex items-center gap-2.5 shrink-0">
+          {rateLimitInfo && (
+            <div
+              title={`Gemma 4 Free-Tier Quota: ${rateLimitInfo.remaining} / ${rateLimitInfo.limit} requests available in current ${rateLimitInfo.windowHours}h window across all IPs`}
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono bg-slate-100 text-slate-700 rounded-lg border border-slate-200"
+            >
+              <Zap className="w-3 h-3 text-indigo-600" />
+              <span>Gemma 4: {rateLimitInfo.remaining}/{rateLimitInfo.limit} (5h)</span>
+            </div>
+          )}
+
           <button
             onClick={onExportBackup}
             title="Export local IndexedDB workspace backup"

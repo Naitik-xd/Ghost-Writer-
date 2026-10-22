@@ -10,7 +10,8 @@ import {
   Deliverable, 
   WorkspaceTab, 
   IntentReconstruction, 
-  RecoveryPlan 
+  RecoveryPlan,
+  GemmaRateLimitInfo
 } from './types';
 import { storage } from './services/storage';
 import { 
@@ -19,7 +20,7 @@ import {
   DEMO_INTENT, 
   DEMO_RECOVERY_PLAN 
 } from './data/demoProject';
-import { reconstructIntentWithGemma } from './services/gemma';
+import { reconstructIntentWithGemma, checkGemmaStatus } from './services/gemma';
 
 import { Navbar } from './components/Navbar';
 import { RecoveryDesk } from './components/RecoveryDesk';
@@ -44,6 +45,7 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [rateLimitInfo, setRateLimitInfo] = useState<GemmaRateLimitInfo | null>(null);
 
   // New Project Modal State
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
@@ -51,10 +53,22 @@ export default function App() {
   const [newCategory, setNewCategory] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
+  const refreshRateLimit = async () => {
+    try {
+      const status = await checkGemmaStatus();
+      if (status.rateLimit) {
+        setRateLimitInfo(status.rateLimit);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   // Initial Data Load & Seeding
   useEffect(() => {
     async function initWorkspace() {
       try {
+        refreshRateLimit();
         const loadedProjects = await storage.getProjects();
         if (loadedProjects.length === 0) {
           // Seed initial demo project for immediate exploration
@@ -223,6 +237,8 @@ export default function App() {
       console.error('Gemma reconstruction error:', err);
       setAnalysisError(err.message || 'Gemma 4 reconstruction failed.');
       setIsAnalyzing(false);
+    } finally {
+      refreshRateLimit();
     }
   };
 
@@ -299,6 +315,7 @@ export default function App() {
         activeProject={activeProject}
         onNewProject={() => setIsNewProjectModalOpen(true)}
         onExportBackup={handleExportWorkspaceBackup}
+        rateLimitInfo={rateLimitInfo}
       />
 
       {/* Main Workspace View Container */}

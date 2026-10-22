@@ -111,8 +111,18 @@ export interface Project {
 
 export type WorkspaceTab = 'desk' | 'vault' | 'intent' | 'recovery' | 'studio';
 
+export interface GemmaRateLimitInfo {
+  limit: number;
+  remaining: number;
+  windowHours: number;
+  resetInMinutes: number;
+}
+
 export interface GemmaErrorResponse {
   error: string;
   code?: 'GEMMA_UNAVAILABLE' | 'INVALID_INPUT' | 'RATE_LIMIT' | 'SERVER_ERROR';
   details?: string;
+  limit?: number;
+  remaining?: number;
+  resetInMinutes?: number;
 }

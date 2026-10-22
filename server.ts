@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { GoogleGenAI } from '@google/genai';
@@ -12,12 +12,75 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const IS_DEV = process.env.NODE_ENV !== 'production';
+const IS_DEV = process.env.NODE_ENV !== 'production' && !process.env.VERCEL;
 
 app.use(express.json({ limit: '15mb' }));
 
+// -------------------------------------------------------------
+// Global Rate Limiter: 50 requests per 5 hours across all IPs
+// -------------------------------------------------------------
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 60 * 1000; // 5 hours in ms
+const MAX_REQUESTS_PER_WINDOW = 50;
+const requestTimestamps: number[] = [];
+
+function getRateLimitState(): { allowed: boolean; remaining: number; limit: number; resetInMinutes: number } {
+  const now = Date.now();
+  const threshold = now - RATE_LIMIT_WINDOW_MS;
+
+  // Prune timestamps older than 5 hours
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < threshold) {
+    requestTimestamps.shift();
+  }
+
+  if (requestTimestamps.length >= MAX_REQUESTS_PER_WINDOW) {
+    const oldest = requestTimestamps[0];
+    const resetMs = (oldest + RATE_LIMIT_WINDOW_MS) - now;
+    const resetInMinutes = Math.max(1, Math.ceil(resetMs / (60 * 1000)));
+    return {
+      allowed: false,
+      remaining: 0,
+      limit: MAX_REQUESTS_PER_WINDOW,
+      resetInMinutes,
+    };
+  }
+
+  const remaining = MAX_REQUESTS_PER_WINDOW - requestTimestamps.length;
+  return {
+    allowed: true,
+    remaining,
+    limit: MAX_REQUESTS_PER_WINDOW,
+    resetInMinutes: 0,
+  };
+}
+
+function rateLimitGemma(req: Request, res: Response, next: NextFunction) {
+  const state = getRateLimitState();
+
+  res.setHeader('X-RateLimit-Limit', state.limit.toString());
+  res.setHeader('X-RateLimit-Remaining', state.remaining.toString());
+  res.setHeader('X-RateLimit-Window', '5h');
+
+  if (!state.allowed) {
+    res.status(429).json({
+      error: `Gemma 4 credit protection: Rate limit of 50 requests per 5 hours reached. Next available request in ~${state.resetInMinutes} minutes.`,
+      code: 'RATE_LIMIT',
+      details: 'This rate limit protects free-tier API quotas and ensures stable availability.',
+      limit: state.limit,
+      remaining: 0,
+      resetInMinutes: state.resetInMinutes,
+    });
+    return;
+  }
+
+  // Record timestamp for valid attempt
+  requestTimestamps.push(Date.now());
+  next();
+}
+
+// -------------------------------------------------------------
 // Determine Gemma 4 Configuration
-const GEMMA_MODEL_ID = process.env.GEMMA_MODEL_ID || 'gemma-4-26b-a4b-it'; // Verified Gemma 4 model in Google AI Studio
+// -------------------------------------------------------------
+const GEMMA_MODEL_ID = process.env.GEMMA_MODEL_ID || 'gemma-4-26b-a4b-it';
 const GEMMA_CUSTOM_URL = process.env.GEMMA_API_URL || null;
 const GEMMA_API_KEY = process.env.GEMMA_API_KEY || process.env.GEMINI_API_KEY || '';
 
@@ -92,21 +155,28 @@ async function callGemma(systemPrompt: string, userPrompt: string, responseJson:
 }
 
 // -------------------------------------------------------------
-// 1. Status & Health Check
+// 1. Status & Health Check (Not rate-limited)
 // -------------------------------------------------------------
 app.get('/api/gemma/status', (_req: Request, res: Response) => {
+  const rateLimitState = getRateLimitState();
   res.json({
     status: GEMMA_API_KEY ? 'ready' : 'missing_key',
     model: 'Gemma 4 (' + GEMMA_MODEL_ID + ')',
     provider: GEMMA_CUSTOM_URL ? 'Custom Gemma Endpoint' : 'Google AI Studio Gemma Open Models',
     hasKey: Boolean(GEMMA_API_KEY),
+    rateLimit: {
+      limit: rateLimitState.limit,
+      remaining: rateLimitState.remaining,
+      windowHours: 5,
+      resetInMinutes: rateLimitState.resetInMinutes,
+    },
   });
 });
 
 // -------------------------------------------------------------
-// 2. Intent Reconstruction with Gemma 4
+// 2. Intent Reconstruction with Gemma 4 (Rate-limited: 50 / 5h)
 // -------------------------------------------------------------
-app.post('/api/gemma/reconstruct', async (req: Request, res: Response) => {
+app.post('/api/gemma/reconstruct', rateLimitGemma, async (req: Request, res: Response) => {
   try {
     const { projectId, fragments } = req.body;
 
@@ -120,7 +190,7 @@ app.post('/api/gemma/reconstruct', async (req: Request, res: Response) => {
 
     const fragmentSummaries = fragments
       .map(
-        (f: any, idx: number) =>
+        (f: any) =>
           `[Fragment ID: ${f.id}] (Title: "${f.title}", Type: ${f.type}, Verified: ${f.isVerified})\n${f.extractedText}\n---`
       )
       .join('\n');
@@ -186,9 +256,9 @@ CRITICAL RULES:
 });
 
 // -------------------------------------------------------------
-// 3. Controlled Non-Destructive Text Assistance with Gemma 4
+// 3. Controlled Non-Destructive Text Assistance with Gemma 4 (Rate-limited: 50 / 5h)
 // -------------------------------------------------------------
-app.post('/api/gemma/assist', async (req: Request, res: Response) => {
+app.post('/api/gemma/assist', rateLimitGemma, async (req: Request, res: Response) => {
   try {
     const { selectedText, instruction, contextFragments } = req.body;
 
@@ -234,9 +304,9 @@ Propose the revised / continued text:`;
 });
 
 // -------------------------------------------------------------
-// 4. Deliverable Generation with Gemma 4
+// 4. Deliverable Generation with Gemma 4 (Rate-limited: 50 / 5h)
 // -------------------------------------------------------------
-app.post('/api/gemma/deliverable', async (req: Request, res: Response) => {
+app.post('/api/gemma/deliverable', rateLimitGemma, async (req: Request, res: Response) => {
   try {
     const { type, projectTitle, intent, fragments } = req.body;
 
@@ -304,9 +374,20 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`Ghostwriter for Reality server running on http://localhost:${PORT}`);
+  // Bind to 0.0.0.0 for container compatibility
+  const server = app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`Ghostwriter for Reality server running on http://0.0.0.0:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    console.error('Server error:', err);
   });
 }
 
-startServer();
+// Start standalone dev/prod server if not imported by Vercel serverless
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
+export { app };
