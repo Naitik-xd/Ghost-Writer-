@@ -1,0 +1,6 @@
+{
+  "name": "Ghostwriter for Reality",
+  "description": "Recover unfinished projects by connecting notes, screenshots, documents, and ideas into an evidence-linked Intent Map, actionable Recovery Plan, and production-ready deliverables.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
