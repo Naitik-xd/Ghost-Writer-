@@ -103,5 +103,7 @@ Ghostwriter is structured for one-click deployment on **Vercel**:
 
 - **Original Implementation**: 100% original codebase and UI styling.
 - **License**: Apache-2.0.
+- **Event**: Built for **Hacktoberfest 2026** (currently in Beta).
+- **Author**: Made with ❤️ by [Naitik](https://na1t1k.vercel.app).
 - **Zero Proprietary Imagery**: Visual elements use pure CSS technical patterns and open-source Lucide vector icons.
 - **Model Attribution**: Powered by open-weights Gemma models developed by Google.

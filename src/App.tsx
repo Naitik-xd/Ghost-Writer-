@@ -377,7 +377,25 @@ export default function App() {
         )}
       </main>
 
-      {/* Recover New Project Modal */}
+      {/* Global Footer */}
+      <footer className="mt-auto border-t border-slate-200 bg-white/80 backdrop-blur-xs py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+          <p className="text-center sm:text-left leading-relaxed">
+            This application was engineered for <span className="font-semibold text-slate-800">Hacktoberfest 2026</span> and is currently in <span className="font-semibold text-amber-700 font-mono">BETA</span>. Please utilize system resources with discretion.
+          </p>
+          <p className="flex items-center gap-1 shrink-0">
+            <span>Made with ❤️ by</span>
+            <a
+              href="https://na1t1k.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-slate-900 hover:text-indigo-600 underline decoration-slate-300 hover:decoration-indigo-500 underline-offset-2 transition-colors"
+            >
+              Naitik
+            </a>
+          </p>
+        </div>
+      </footer>
       {isNewProjectModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl animate-in fade-in duration-150">
