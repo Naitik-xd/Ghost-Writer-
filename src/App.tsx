@@ -307,7 +307,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-tech-grid flex flex-col text-slate-900 font-sans">
+    <div className="min-h-screen w-full overflow-x-hidden bg-tech-grid flex flex-col text-slate-900 font-sans">
       {/* 3-Zone Top Navigation Contract */}
       <Navbar
         currentTab={currentTab}
